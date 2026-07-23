@@ -297,6 +297,88 @@ function renderView() { if (state.view === "list") renderList(); else renderCale
 
 function render() { renderStats(); renderWeekPanel(); renderDatalists(); renderFilterOptions(); renderLegend(); renderView(); }
 
+/* ---------- 오픈 데이터 붙여넣기 업데이트 ---------- */
+let importedRows = [];
+const numOrNull = (s) => { const n = parseFloat(String(s ?? "").replace(/[^\d.]/g, "")); return Number.isFinite(n) ? n : null; };
+const normName = (s) => String(s || "").toLowerCase().replace(/\(광고\)/g, "").replace(/[\s()[\]/:_.,-]/g, "");
+const nameTokens = (s) => String(s || "").toLowerCase().replace(/[()[\]/:_.,-]/g, " ").split(/\s+/).filter((t) => t.length >= 2);
+
+function scoreMatch(name, item, month) {
+  const a = normName(name), b = normName(item.title);
+  if (!a || !b) return 0;
+  let s = 0;
+  if (a.includes(b) || b.includes(a)) s = 100 + Math.min(a.length, b.length);
+  else {
+    // 원본 콘텐츠명의 토큰이 대상 제목(공백제거)에 부분문자열로 포함되면 가점
+    for (const t of nameTokens(name)) if (b.includes(t)) s += t.length;
+    for (const t of nameTokens(item.title)) if (a.includes(t)) s += t.length;
+  }
+  if (s > 0 && month && item.sendDate && item.sendDate.startsWith(month)) s += 30; // 같은 발송월 우선
+  return s;
+}
+function bestMatch(name, month) {
+  let best = null, bs = 0;
+  for (const it of state.items) { const s = scoreMatch(name, it, month); if (s > bs) { bs = s; best = it; } }
+  return bs >= 2 ? best : null;
+}
+
+function parsePaste(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (!lines.length) return { error: "붙여넣은 데이터가 없습니다." };
+  const rows = lines.map((l) => l.split("\t"));
+  const header = rows[0].map((h) => h.trim());
+  if (!header.some((h) => /콘텐츠명|열람률|타입/.test(h))) return { error: "헤더 행(콘텐츠명·열람률 등)을 포함해 복사해주세요." };
+  const idx = {};
+  header.forEach((h, i) => {
+    if (/콘텐츠/.test(h)) idx.name = i;
+    else if (/열람률/.test(h)) idx.openRate = i;
+    else if (/열람/.test(h)) idx.opens = i;
+    else if (/실패율/.test(h)) idx.failRate = i;
+    else if (/발송성공/.test(h)) idx.success = i;
+    else if (/^발송$/.test(h)) idx.sent = i;
+  });
+  const monthOf = (r) => { for (const c of r) { const m = (c || "").trim(); if (/^\d{4}-(0[1-9]|1[0-2])$/.test(m)) return m; } return ""; };
+  const data = rows.slice(1).map((r) => ({
+    name: (r[idx.name] || "").trim(),
+    month: monthOf(r),
+    sent: numOrNull(r[idx.sent]), success: numOrNull(r[idx.success]),
+    failRate: numOrNull(r[idx.failRate]), opens: numOrNull(r[idx.opens]), openRate: numOrNull(r[idx.openRate]),
+  })).filter((x) => x.name);
+  if (!data.length) return { error: "데이터 행을 찾지 못했습니다." };
+  return { rows: data };
+}
+
+function renderMatchTable() {
+  const opts = state.items.slice().sort((a, b) => a.sendDate.localeCompare(b.sendDate))
+    .map((it) => ({ id: it.id, label: `${it.sendDate.slice(5)} · ${it.title}` }));
+  $("matchTable").innerHTML = `<table class="match-tbl"><thead><tr><th>원본 콘텐츠명</th><th>열람률</th><th>→ 매칭 대상 (자동추천)</th></tr></thead><tbody>` +
+    importedRows.map((p, i) => {
+      const best = bestMatch(p.name, p.month);
+      const optHtml = ['<option value="">— 무시 —</option>']
+        .concat(opts.map((o) => `<option value="${o.id}" ${best && best.id === o.id ? "selected" : ""}>${escapeHtml(o.label)}</option>`)).join("");
+      return `<tr><td>${escapeHtml(p.name)}</td><td>${p.openRate ?? ""}${p.openRate != null ? "%" : ""}</td><td><select class="match-sel" data-idx="${i}">${optHtml}</select></td></tr>`;
+    }).join("") + "</tbody></table>";
+  $("applyImportBtn").style.display = "inline-flex";
+}
+
+async function applyImport() {
+  const sels = [...$("matchTable").querySelectorAll(".match-sel")];
+  let n = 0;
+  for (const s of sels) {
+    const id = s.value;
+    if (!id) continue;
+    const p = importedRows[+s.dataset.idx];
+    const it = state.items.find((x) => x.id === id);
+    const result = {
+      sent: p.sent, success: p.success, failRate: p.failRate, opens: p.opens, openRate: p.openRate,
+      feedback: it?.result?.feedback ?? null, recordedAt: new Date().toISOString(),
+    };
+    try { await updateDoc(doc(contentsCol, id), { result }); n++; } catch (e) { alert("적용 실패: " + e.message); return; }
+  }
+  alert(`${n}건의 오픈 데이터를 반영했습니다.`);
+  $("importModalBackdrop").classList.add("hidden");
+}
+
 /* ---------- 모달 ---------- */
 function openModal(dateStr, item) {
   state.editingId = item ? item.id : null;
@@ -317,6 +399,10 @@ function openModal(dateStr, item) {
   $("deleteBtn").style.display = item ? "inline-flex" : "none";
   $("f-openRate").value = item?.result?.openRate ?? "";
   $("f-feedback").value = item?.result?.feedback ?? "";
+  const r = item?.result;
+  $("resultMeta").textContent = (r && (r.sent != null || r.opens != null))
+    ? `발송 ${r.sent ?? "-"} · 성공 ${r.success ?? "-"} · 열람 ${r.opens ?? "-"} · 실패율 ${r.failRate ?? "-"}%`
+    : "";
   $("modalBackdrop").classList.remove("hidden");
   setTimeout(() => $("f-title").focus(), 30);
 }
@@ -457,6 +543,18 @@ function bindUi() {
     const r = e.target.closest(".list-row");
     if (r) { const it = state.items.find((i) => i.id === r.dataset.id); if (it) openModal(it.sendDate, it); }
   });
+
+  // 오픈 데이터 붙여넣기 업데이트
+  $("statsBtn").onclick = () => { $("pasteArea").value = ""; $("matchTable").innerHTML = ""; $("applyImportBtn").style.display = "none"; $("importModalBackdrop").classList.remove("hidden"); };
+  $("importCloseBtn").onclick = () => $("importModalBackdrop").classList.add("hidden");
+  $("importModalBackdrop").onclick = (e) => { if (e.target === $("importModalBackdrop")) $("importModalBackdrop").classList.add("hidden"); };
+  $("parseBtn").onclick = () => {
+    const res = parsePaste($("pasteArea").value);
+    if (res.error) { alert(res.error); return; }
+    importedRows = res.rows;
+    renderMatchTable();
+  };
+  $("applyImportBtn").onclick = applyImport;
 
   // 카테고리 관리
   $("catBtn").onclick = () => { renderCatManager(); $("catModalBackdrop").classList.remove("hidden"); };

@@ -40,33 +40,53 @@ function bars(map, colorFn, fmt) {
   </div>`).join("") || '<div class="wk-empty">데이터 없음</div>';
 }
 
+const mean = (arr) => (arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null);
+const rateFmt = (v) => `${v.count}건 · ${v.rates.length ? mean(v.rates).toFixed(1) + "%" : "-"}`;
+
 function renderDashboard(rows, range) {
-  const withRate = rows.filter((r) => r.result && r.result.openRate != null);
-  const avg = withRate.length ? (withRate.reduce((s, r) => s + Number(r.result.openRate), 0) / withRate.length) : null;
-  const readyCnt = rows.filter((r) => r.ready).length;
+  const rated = rows.filter((r) => r.result && r.result.openRate != null);
+  const avgOpen = mean(rated.map((r) => Number(r.result.openRate)));
+  const failVals = rows.filter((r) => r.result && r.result.failRate != null).map((r) => Number(r.result.failRate));
+  const avgFail = mean(failVals);
   const internal = rows.filter((r) => /임직원|내부용/i.test(`${r.target || ""} ${r.title || ""}`)).length;
 
   $("dashRange").textContent = `${range.from} ~ ${range.to}`;
   $("dashCards").innerHTML = [
     { k: "📨 총 발송", v: `${rows.length}<small>건</small>` },
-    { k: "📈 평균 오픈률", v: avg == null ? "-" : `${avg.toFixed(1)}<small>%</small>`, cls: "good" },
-    { k: "✅ 준비 완료", v: `${readyCnt}<small>/${rows.length}</small>` },
+    { k: "📈 평균 열람률", v: avgOpen == null ? "-" : `${avgOpen.toFixed(1)}<small>%</small>`, cls: "good" },
+    { k: "🚚 평균 실패율", v: avgFail == null ? "-" : `${avgFail.toFixed(1)}<small>%</small>`, cls: avgFail != null && avgFail >= 10 ? "alert" : "" },
     { k: "🏢 사내 / 대외", v: `${internal}<small> / ${rows.length - internal}</small>` },
   ].map((c) => `<div class="stat ${c.cls || ""}"><div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join("");
 
-  const byCat = {}, byOwner = {};
+  const byCat = {}, byFormat = {};
   for (const r of rows) {
+    const rate = r.result && r.result.openRate != null ? Number(r.result.openRate) : null;
     const c = r.category || "";
     (byCat[c] ||= { count: 0, rates: [] }).count++;
-    if (r.result && r.result.openRate != null) byCat[c].rates.push(Number(r.result.openRate));
-    const o = r.owner || "";
-    (byOwner[o] ||= { count: 0 }).count++;
+    if (rate != null) byCat[c].rates.push(rate);
+    const f = r.format || "";
+    (byFormat[f] ||= { count: 0, rates: [] }).count++;
+    if (rate != null) byFormat[f].rates.push(rate);
   }
-  $("dashCat").innerHTML = bars(byCat, colorOf, (v) => {
-    const a = v.rates.length ? (v.rates.reduce((s, x) => s + x, 0) / v.rates.length).toFixed(1) + "%" : "-";
-    return `${v.count}건 · ${a}`;
-  });
-  $("dashOwner").innerHTML = bars(byOwner, () => "#4f46e5", (v) => `${v.count}건`);
+  $("dashCat").innerHTML = bars(byCat, colorOf, rateFmt);
+  $("dashFormat").innerHTML = bars(byFormat, (k) => (k ? hashColor(k) : "#94a3b8"), rateFmt);
+
+  // 열람률 랭킹 (Top/Bottom)
+  const sorted = rated.slice().sort((a, b) => Number(b.result.openRate) - Number(a.result.openRate));
+  if (!sorted.length) {
+    $("dashRank").innerHTML = '<div class="wk-empty">아직 열람률 데이터가 없습니다. “📥 오픈데이터”로 업데이트하세요.</div>';
+  } else {
+    const line = (r, medal) => `<div class="rank-row"><span class="rank-medal">${medal}</span><span class="rank-rate">${Number(r.result.openRate).toFixed(1)}%</span><span class="rank-title">${escapeHtml(r.title)}</span></div>`;
+    if (sorted.length <= 6) {
+      // 데이터가 적으면 단일 순위 목록 (상/하위 중복 방지)
+      $("dashRank").innerHTML = sorted.map((r, i) => line(r, ["🥇", "🥈", "🥉"][i] || `${i + 1}`)).join("");
+    } else {
+      const top = sorted.slice(0, 3).map((r, i) => line(r, ["🥇", "🥈", "🥉"][i]));
+      const bottom = sorted.slice(-3).reverse().map((r) => line(r, "🔻"));
+      $("dashRank").innerHTML = `<div class="rank-cols"><div><div class="rank-head">상위</div>${top.join("")}</div>` +
+        `<div><div class="rank-head">하위</div>${bottom.join("")}</div></div>`;
+    }
+  }
   $("dashboard").style.display = "";
 }
 
