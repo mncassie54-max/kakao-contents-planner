@@ -1,33 +1,30 @@
-"use strict";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+import { requirePassword } from "./lib/gate.js";
+import { weekRange, ymd } from "./lib/week.js";
 
 const state = { year: 0, month: 0, items: [], editingId: null };
+let contentsCol = null;
 
 const $ = (id) => document.getElementById(id);
 function pad(n) { return String(n).padStart(2, "0"); }
-function ymd(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
-function todayStr() { const t = new Date(); return ymd(t.getFullYear(), t.getMonth(), t.getDate()); }
-
-async function api(method, url, body) {
-  const opts = { method, headers: { "Content-Type": "application/json" } };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  if (!res.ok) { throw new Error((await res.json().catch(() => ({}))).error || res.statusText); }
-  return res.status === 200 || res.status === 201 ? res.json() : null;
+function ymdParts(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+function todayStr() { const t = new Date(); return ymdParts(t.getFullYear(), t.getMonth(), t.getDate()); }
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
-async function loadMonth() {
-  // 현재 월 1일 ~ 말일 (양끝 포함). 캘린더는 현재 월 셀만 렌더하므로 이 범위로 충분.
-  const daysInMonth = new Date(state.year, state.month + 1, 0).getDate();
-  const from = ymd(state.year, state.month, 1);
-  const to = ymd(state.year, state.month, daysInMonth);
-  state.items = await api("GET", `/api/contents?from=${from}&to=${to}`);
-  renderCalendar();
-  renderDatalists();
-}
-
-async function loadBanner() {
-  const week = await api("GET", "/api/week");
+function renderBanner() {
+  const { start, end } = weekRange(new Date());
+  const s = ymd(start), e = ymd(end);
+  const week = state.items
+    .filter((it) => it.sendDate >= s && it.sendDate < e)
+    .sort((a, b) => a.sendDate.localeCompare(b.sendDate) || a.sendTime.localeCompare(b.sendTime));
   const el = $("banner");
+  el.className = "banner";
   if (!week.length) {
     el.innerHTML = "<strong>📢 이번 주 발송 예정 0건</strong><div>예정된 발송이 없습니다.</div>";
     return;
@@ -36,10 +33,6 @@ async function loadBanner() {
     .map((it) => `<li>${it.sendDate.slice(5)} ${it.sendTime} · ${escapeHtml(it.title)}</li>`)
     .join("");
   el.innerHTML = `<strong>📢 이번 주 발송 예정 ${week.length}건</strong><ul>${lis}</ul>`;
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
 function renderCalendar() {
@@ -58,8 +51,9 @@ function renderCalendar() {
   for (let i = 0; i < offset; i++) cells.push('<div class="cal-cell dim"></div>');
   const today = todayStr();
   for (let d = 1; d <= daysInMonth; d++) {
-    const key = ymd(year, month, d);
+    const key = ymdParts(year, month, d);
     const chips = (byDate[key] || [])
+      .sort((a, b) => a.sendTime.localeCompare(b.sendTime))
       .map((it) => {
         let cls = "chip";
         if (it.result) cls += " done";
@@ -79,6 +73,8 @@ function renderDatalists() {
     $(`dl-${key}`).innerHTML = vals.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
   }
 }
+
+function render() { renderBanner(); renderCalendar(); renderDatalists(); }
 
 function openModal(dateStr, item) {
   state.editingId = item ? item.id : null;
@@ -114,34 +110,36 @@ function formData() {
   };
 }
 
-async function refresh() { await Promise.all([loadMonth(), loadBanner()]); }
-
 async function save() {
   const d = formData();
   if (!d.sendDate || !d.sendTime || !d.title) { alert("발송일, 발송시간, 제목은 필수입니다."); return; }
   try {
-    if (state.editingId) await api("PATCH", `/api/contents/${state.editingId}`, d);
-    else await api("POST", "/api/contents", d);
+    if (state.editingId) {
+      await updateDoc(doc(contentsCol, state.editingId), d);
+    } else {
+      await addDoc(contentsCol, { ...d, createdAt: new Date().toISOString(), result: null });
+    }
     closeModal();
-    await refresh();
   } catch (e) { alert("저장 실패: " + e.message); }
 }
 
 async function saveResult() {
   if (!state.editingId) return;
+  const openRateRaw = $("f-openRate").value;
+  const result = {
+    openRate: openRateRaw === "" ? null : Number(openRateRaw),
+    feedback: $("f-feedback").value || null,
+    recordedAt: new Date().toISOString(),
+  };
   try {
-    await api("PUT", `/api/contents/${state.editingId}/result`, {
-      openRate: $("f-openRate").value,
-      feedback: $("f-feedback").value,
-    });
+    await updateDoc(doc(contentsCol, state.editingId), { result });
     closeModal();
-    await refresh();
   } catch (e) { alert("결과 저장 실패: " + e.message); }
 }
 
 async function remove() {
   if (!state.editingId || !confirm("삭제할까요?")) return;
-  try { await api("DELETE", `/api/contents/${state.editingId}`); closeModal(); await refresh(); }
+  try { await deleteDoc(doc(contentsCol, state.editingId)); closeModal(); }
   catch (e) { alert("삭제 실패: " + e.message); }
 }
 
@@ -150,14 +148,10 @@ function shiftMonth(delta) {
   if (m < 0) { state.year--; m = 11; }
   else if (m > 11) { state.year++; m = 0; }
   state.month = m;
-  loadMonth();
+  renderCalendar();
 }
 
-function init() {
-  const t = new Date();
-  state.year = t.getFullYear();
-  state.month = t.getMonth();
-
+function bindUi() {
   $("prevBtn").onclick = () => shiftMonth(-1);
   $("nextBtn").onclick = () => shiftMonth(1);
   $("closeBtn").onclick = closeModal;
@@ -165,7 +159,6 @@ function init() {
   $("saveResultBtn").onclick = saveResult;
   $("deleteBtn").onclick = remove;
   $("modalBackdrop").onclick = (e) => { if (e.target === $("modalBackdrop")) closeModal(); };
-
   $("calBody").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip");
     if (chip) {
@@ -176,8 +169,40 @@ function init() {
     const cell = e.target.closest(".cal-cell:not(.dim)");
     if (cell && cell.dataset.date) openModal(cell.dataset.date, null);
   });
-
-  refresh();
 }
 
-init();
+function configMissing() {
+  return !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("PASTE");
+}
+
+async function main() {
+  await requirePassword();
+
+  const t = new Date();
+  state.year = t.getFullYear();
+  state.month = t.getMonth();
+  bindUi();
+  renderCalendar();
+
+  if (configMissing()) {
+    const el = $("banner");
+    el.className = "banner warn";
+    el.innerHTML = "⚠️ <strong>Firebase 설정이 필요합니다.</strong> <code>firebase-config.js</code>에 콘솔의 config 값을 넣어주세요.";
+    return;
+  }
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  contentsCol = collection(db, "contents");
+
+  onSnapshot(contentsCol, (snap) => {
+    state.items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  }, (err) => {
+    const el = $("banner");
+    el.className = "banner warn";
+    el.innerHTML = `⚠️ <strong>데이터 연결 오류:</strong> ${escapeHtml(err.message)}`;
+  });
+}
+
+main();

@@ -1,7 +1,6 @@
-"use strict";
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-const { weekRange, ymd } = require("../src/week");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { weekRange, ymd } from "../lib/week.js";
 
 test("수요일 기준 → 월요일 시작, 다음주 월요일 end(배타)", () => {
   const { start, end } = weekRange(new Date(2026, 6, 22, 9, 0)); // 2026-07-22 수

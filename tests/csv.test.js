@@ -1,7 +1,6 @@
-"use strict";
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-const { toCsv } = require("../src/csv");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { toCsv } from "../lib/csv.js";
 
 const row = {
   id: "1",

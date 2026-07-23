@@ -11,6 +11,7 @@ h2 { margin: 0; }
 a.navlink { color: #2563eb; text-decoration: none; }
 .banner { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
 .banner ul { margin: 6px 0 0; padding-left: 18px; }
+.banner.warn { background: #fee2e2; border-color: #fca5a5; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-head { text-align: center; font-weight: 600; padding: 6px 0; color: #555; }
 .cal-cell { min-height: 92px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; cursor: pointer; font-size: 12px; }
@@ -34,3 +35,11 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 6px; text-align: left; }
 th { border-bottom: 2px solid #ddd; }
 tbody tr:nth-child(even) { background: #fafafa; }
+
+/* 비밀번호 가림막 */
+.gate-backdrop { position: fixed; inset: 0; background: #f7f7f8; display: flex; align-items: center; justify-content: center; z-index: 100; }
+.gate-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px; width: 320px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+.gate-box h3 { margin: 0 0 16px; }
+.gate-box label { display: block; font-size: 13px; margin-bottom: 4px; color: #555; }
+.gate-box input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; }
+.gate-err { color: #dc2626; font-size: 13px; margin-top: 8px; }

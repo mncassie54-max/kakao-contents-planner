@@ -3,9 +3,8 @@
   "configurations": [
     {
       "name": "kcp",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "env": { "PORT": "3100" },
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3100"],
       "port": 3100
     }
   ]

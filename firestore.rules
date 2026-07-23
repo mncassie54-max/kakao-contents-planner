@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// ⚠️ 로그인 없음(공개). 화면 가림막 비밀번호는 보안이 아니며,
+// 이 규칙상 DB는 누구나 읽기/쓰기 가능합니다. 더미/훈련 데이터 전용으로만 사용하세요.
+// 실제 데이터 보호가 필요하면 Firebase Auth를 붙이고 아래를 request.auth != null 로 바꾸세요.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /contents/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
