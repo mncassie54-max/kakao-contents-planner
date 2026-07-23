@@ -46,7 +46,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", Roboto, sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Malgun Gothic", sans-serif;
   color: var(--text);
   background: var(--bg);
   line-height: 1.45;
@@ -131,10 +131,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .cal-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .cal-toolbar .month { font-size: 17px; font-weight: 750; margin: 0 4px; min-width: 118px; }
 .cal-toolbar .spacer { flex: 1; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .cal-head { text-align: center; font-weight: 600; font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
-.cal-head.sat { color: #2563eb; }
-.cal-head.sun { color: var(--red); }
 .cal-cell {
   min-height: 104px; background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; padding: 6px; cursor: pointer; overflow: hidden;
@@ -184,15 +182,37 @@ th { border-bottom: 1px solid var(--border-strong); color: var(--muted); font-si
 tbody tr { border-bottom: 1px solid var(--border); }
 tbody tr:hover { background: var(--surface-2); }
 
-/* Password gate */
-.gate-backdrop { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-.gate-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 30px; width: 340px; max-width: 100%; box-shadow: var(--shadow-lg); text-align: left; }
-.gate-box .brand { justify-content: flex-start; margin-bottom: 4px; }
-.gate-box p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
-.gate-box label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-.gate-box input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 10px; font: inherit; background: var(--surface); color: var(--text); }
-.gate-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
-.gate-err { color: var(--red); font-size: 13px; margin-top: 8px; }
+/* Password gate — glassmorphism + aurora */
+.gate-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; background: #0b0b12; }
+.gate-bg { position: absolute; inset: -25%; z-index: 0; filter: blur(48px) saturate(1.25);
+  background:
+    radial-gradient(38% 38% at 20% 28%, rgba(124,131,255,.60), transparent 60%),
+    radial-gradient(42% 42% at 82% 18%, rgba(254,229,0,.34), transparent 60%),
+    radial-gradient(48% 48% at 62% 88%, rgba(99,102,241,.55), transparent 62%),
+    radial-gradient(40% 40% at 12% 82%, rgba(236,72,153,.35), transparent 60%),
+    #0b0b12;
+  animation: gateFloat 16s ease-in-out infinite alternate; }
+@keyframes gateFloat { from { transform: translate3d(-3%, -2%, 0) scale(1.06); } to { transform: translate3d(3%, 2%, 0) scale(1.16); } }
+.gate-box { position: relative; z-index: 1; width: 366px; max-width: 100%; padding: 34px 30px; border-radius: 26px; text-align: center; color: #fff;
+  background: rgba(255,255,255,.08); backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,.18); box-shadow: 0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.28);
+  animation: gateIn .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes gateIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.gate-logo { width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 20px; display: grid; place-items: center; font-size: 30px;
+  background: linear-gradient(135deg, #fee500, #ffcf00); box-shadow: 0 12px 28px rgba(254,229,0,.38); }
+.gate-box h3 { margin: 0 0 4px; font-size: 21px; font-weight: 750; letter-spacing: -.02em; color: #fff; }
+.gate-sub { margin: 0 0 24px; font-size: 13px; color: rgba(255,255,255,.66); }
+.gate-field { position: relative; text-align: left; }
+.gate-field .ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: .7; font-size: 15px; }
+.gate-box input { width: 100%; padding: 14px 14px 14px 42px; border-radius: 15px; font: inherit; font-size: 15px; color: #fff;
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22); transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.gate-box input::placeholder { color: rgba(255,255,255,.5); }
+.gate-box input:focus { outline: none; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.16); box-shadow: 0 0 0 4px rgba(124,131,255,.35); }
+.gate-btn { width: 100%; margin-top: 16px; padding: 14px; border-radius: 15px; border: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 15px;
+  color: #0b0b12; background: linear-gradient(135deg, #fee500, #ffcf00); transition: transform .08s ease, filter .15s ease, box-shadow .15s ease; box-shadow: 0 10px 24px rgba(254,229,0,.3); }
+.gate-btn:hover { filter: brightness(1.04); }
+.gate-btn:active { transform: translateY(1px); }
+.gate-err { color: #ffd4d4; font-size: 13px; margin-top: 10px; }
 
 .notice { padding: 12px 16px; border-radius: 12px; font-size: 13.5px; }
 .notice.warn { background: var(--red-weak); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); }

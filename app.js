@@ -84,21 +84,20 @@ function renderWeekPanel() {
 function renderCalendar() {
   const { year, month } = state;
   $("monthLabel").textContent = `${year}년 ${month + 1}월`;
-  const head = ["월", "화", "수", "목", "금", "토", "일"];
-  $("calHead").innerHTML = head
-    .map((w, i) => `<div class="cal-head ${i === 5 ? "sat" : i === 6 ? "sun" : ""}">${w}</div>`)
-    .join("");
+  const head = ["월", "화", "수", "목", "금"]; // 주말 숨김
+  $("calHead").innerHTML = head.map((w) => `<div class="cal-head">${w}</div>`).join("");
 
-  const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const byDate = {};
   for (const it of state.items) (byDate[it.sendDate] ||= []).push(it);
 
   const today = todayStr();
   const cells = [];
-  for (let i = 0; i < offset; i++) cells.push('<div class="cal-cell dim"></div>');
+  let started = false;
   for (let d = 1; d <= daysInMonth; d++) {
+    const dow = (new Date(year, month, d).getDay() + 6) % 7; // 월=0 ... 일=6
+    if (dow >= 5) continue; // 토·일 숨김
+    if (!started) { for (let i = 0; i < dow; i++) cells.push('<div class="cal-cell dim"></div>'); started = true; }
     const key = ymdParts(year, month, d);
     const isToday = key === today;
     const chips = (byDate[key] || [])
@@ -115,7 +114,7 @@ function renderCalendar() {
         <div class="cal-date"><span class="num">${d}</span></div>${chips}</div>`
     );
   }
-  while (cells.length % 7 !== 0) cells.push('<div class="cal-cell dim"></div>');
+  while (cells.length % 5 !== 0) cells.push('<div class="cal-cell dim"></div>');
   $("calBody").innerHTML = cells.join("");
 }
 
