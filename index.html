@@ -59,7 +59,10 @@
         <div><label>카테고리</label><input id="f-category" list="dl-category" placeholder="뉴스레터 등" /></div>
         <div><label>제품명</label><input id="f-product" list="dl-product" /></div>
       </div>
-      <label>포맷</label><input id="f-format" list="dl-format" placeholder="텍스트+이미지 / 카드뉴스 등" />
+      <div class="row">
+        <div><label>포맷</label><input id="f-format" list="dl-format" placeholder="텍스트+이미지 / 카드뉴스 등" /></div>
+        <div><label>발송 타겟(진료과)</label><input id="f-target" list="dl-target" placeholder="예: 순환기내과" /></div>
+      </div>
       <label>코멘트</label><textarea id="f-comment" rows="2"></textarea>
 
       <label class="ready-toggle" for="f-ready">
@@ -89,6 +92,7 @@
   <datalist id="dl-category"></datalist>
   <datalist id="dl-product"></datalist>
   <datalist id="dl-format"></datalist>
+  <datalist id="dl-target"></datalist>
 
   <script type="module" src="./app.js"></script>
 </body>

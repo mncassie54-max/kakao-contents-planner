@@ -120,7 +120,7 @@ function renderCalendar() {
 }
 
 function renderDatalists() {
-  for (const key of ["category", "product", "format"]) {
+  for (const key of ["category", "product", "format", "target"]) {
     const vals = [...new Set(state.items.map((i) => i[key]).filter(Boolean))];
     $(`dl-${key}`).innerHTML = vals.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
   }
@@ -140,6 +140,7 @@ function openModal(dateStr, item) {
   $("f-category").value = item?.category || "";
   $("f-product").value = item?.product || "";
   $("f-format").value = item?.format || "";
+  $("f-target").value = item?.target || "";
   $("f-comment").value = item?.comment || "";
   $("f-ready").checked = !!item?.ready;
   $("resultSection").style.display = item ? "block" : "none";
@@ -160,6 +161,7 @@ function formData() {
     category: $("f-category").value,
     product: $("f-product").value,
     format: $("f-format").value,
+    target: $("f-target").value,
     comment: $("f-comment").value,
     ready: $("f-ready").checked,
   };
@@ -204,10 +206,25 @@ function shiftMonth(delta) {
   state.month = m;
   renderCalendar(); renderStats();
 }
+let monthAnchor = null; // 마지막으로 인식한 "실제 현재 월"
+
 function goToday() {
   const t = new Date();
   state.year = t.getFullYear(); state.month = t.getMonth();
+  monthAnchor = { y: state.year, m: state.month };
   renderCalendar(); renderStats();
+}
+
+// 앱을 열어둔 채 달이 바뀌면(자정/월말 경과), 현재 월을 보고 있던 경우 자동으로 새 달로 이동.
+function maybeRollMonth() {
+  const t = new Date();
+  const y = t.getFullYear(), m = t.getMonth();
+  if (!monthAnchor) { monthAnchor = { y, m }; return; }
+  if (y !== monthAnchor.y || m !== monthAnchor.m) {
+    const wasViewingCurrent = state.year === monthAnchor.y && state.month === monthAnchor.m;
+    if (wasViewingCurrent) goToday();     // 사용자가 현재 월을 보고 있었으면 새 달로
+    else monthAnchor = { y, m };          // 다른 달을 보고 있었으면 앵커만 갱신
+  }
 }
 
 function bindUi() {
@@ -221,6 +238,8 @@ function bindUi() {
   $("deleteBtn").onclick = remove;
   $("modalBackdrop").onclick = (e) => { if (e.target === $("modalBackdrop")) closeModal(); };
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeRollMonth(); });
+  window.addEventListener("focus", maybeRollMonth);
 
   $("calBody").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip");

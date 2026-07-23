@@ -31,13 +31,14 @@ async function preview() {
   const rows = await fetchRange(r.from, r.to);
   const tbody = $("tbody");
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="color:#888">해당 기간 데이터가 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted); padding:16px">해당 기간 데이터가 없습니다.</td></tr>';
     return;
   }
   tbody.innerHTML = rows
     .map((row) => `<tr>
       <td>${row.sendDate}</td><td>${row.sendTime}</td><td>${escapeHtml(row.title)}</td>
       <td>${escapeHtml(row.category)}</td><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.format)}</td>
+      <td>${escapeHtml(row.target)}</td>
       <td>${row.result?.openRate ?? ""}</td><td>${escapeHtml(row.result?.feedback)}</td>
     </tr>`)
     .join("");
