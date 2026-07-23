@@ -6,10 +6,18 @@ import { firebaseConfig } from "./firebase-config.js";
 import { requirePassword } from "./lib/gate.js";
 import { weekRange, ymd } from "./lib/week.js";
 
-const state = { year: 0, month: 0, items: [], categories: [], people: [], scopeFilter: "all", view: "calendar", search: "", filterCategory: "", filterOwner: "", editingId: null };
+const state = { year: 0, month: 0, items: [], categories: [], people: [], targets: [], scopeFilter: "all", view: "calendar", search: "", filterCategory: "", filterOwner: "", editingId: null };
 let contentsCol = null;
 let categoriesCol = null;
 let peopleCol = null;
+let targetsCol = null;
+
+// 발송 타겟(진료과) 기본 목록 — 처음 1회 자동 시드, 이후 새 값 입력 시 자동 추가
+const DEFAULT_TARGETS = [
+  "전체 HCP",
+  "순환기내과", "심장내과", "내분비내과", "신장내과", "가정의학과", // CV 관련
+  "정형외과", "마취통증의학과", "신경외과", "재활의학과", "류마티스내과", // PAIN 관련
+];
 
 // 2026 대한민국 공휴일 (대체공휴일 포함). 필요시 값만 수정하세요.
 const HOLIDAYS = {
@@ -200,13 +208,16 @@ function renderCalendar() {
 }
 
 function renderDatalists() {
-  for (const key of ["product", "format", "target"]) {
+  for (const key of ["product", "format"]) {
     const vals = [...new Set(state.items.map((i) => i[key]).filter(Boolean))];
     $(`dl-${key}`).innerHTML = vals.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
   }
   // 카테고리: 관리 목록 + 실제 사용된 값 합집합
   const catNames = [...new Set([...state.categories.map((c) => c.name), ...state.items.map((i) => i.category).filter(Boolean)])];
   $("dl-category").innerHTML = catNames.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
+  // 발송 타겟(진료과): 관리 목록 + 실제 사용된 값 합집합
+  const tgtNames = [...new Set([...state.targets, ...state.items.map((i) => i.target).filter(Boolean)])];
+  $("dl-target").innerHTML = tgtNames.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
 }
 
 function renderPeople() {
@@ -430,6 +441,8 @@ async function save() {
   try {
     if (state.editingId) await updateDoc(doc(contentsCol, state.editingId), d);
     else await addDoc(contentsCol, { ...d, createdAt: new Date().toISOString(), result: null });
+    // 새로 입력된 진료과는 타겟 목록에 자동 추가
+    if (d.target && targetsCol && !state.targets.includes(d.target)) await addDoc(targetsCol, { name: d.target });
     closeModal();
   } catch (e) { alert("저장 실패: " + e.message); }
 }
@@ -616,6 +629,14 @@ async function main() {
   contentsCol = collection(db, "contents");
   categoriesCol = collection(db, "categories");
   peopleCol = collection(db, "people");
+  targetsCol = collection(db, "targets");
+
+  let tgtSeeded = false;
+  onSnapshot(targetsCol, (snap) => {
+    state.targets = snap.docs.map((d) => d.data().name).filter(Boolean);
+    if (!tgtSeeded && state.targets.length === 0) { tgtSeeded = true; DEFAULT_TARGETS.forEach((name) => addDoc(targetsCol, { name })); }
+    renderDatalists();
+  });
 
   let catSeeded = false;
   onSnapshot(categoriesCol, (snap) => {
