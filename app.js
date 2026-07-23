@@ -25,6 +25,26 @@ function weekItems() {
     .sort((a, b) => a.sendDate.localeCompare(b.sendDate) || a.sendTime.localeCompare(b.sendTime));
 }
 
+const CATEGORY_META = {
+  "AI Literacy": { color: "#64748b", short: "AI" },
+  "V-insight": { color: "#4f46e5", short: "V-insight" },
+  "메디닥링크": { color: "#0891b2", short: "메디닥" },
+  "카드뉴스": { color: "#d97706", short: "카드뉴스" },
+  "쇼츠": { color: "#db2777", short: "쇼츠" },
+  "VDS": { color: "#7c3aed", short: "VDS" },
+  "웨비나": { color: "#059669", short: "웨비나" },
+};
+const NO_CAT = { color: "#94a3b8", short: "기타" };
+const catMeta = (c) => CATEGORY_META[c] || NO_CAT;
+
+// 발송 대상 구분: 사내(임직원) / 대외(HCP) / 미지정
+function scopeOf(it) {
+  const s = `${it.target || ""} ${it.title || ""}`;
+  if (/임직원|내부용|internal/i.test(s)) return "internal";
+  if (/HCP/i.test(s)) return "hcp";
+  return "";
+}
+
 function statusOf(it) {
   const today = todayStr();
   if (it.ready) return { key: "ready", label: "준비완료", cls: "ready" };
@@ -70,10 +90,16 @@ function renderWeekPanel() {
     .map((it) => {
       const st = statusOf(it);
       const badge = it.ready ? "" : `<span class="badge ${st.cls}">${st.label}</span>`;
+      const cm = catMeta(it.category);
+      const scope = scopeOf(it);
+      const scopeBadge = scope === "internal" ? '<span class="c-scope int">사내</span>'
+        : scope === "hcp" ? '<span class="c-scope hcp">HCP</span>' : "";
       return `<div class="wk-row ${it.ready ? "done" : ""}">
         <input type="checkbox" class="wk-check" data-id="${it.id}" ${it.ready ? "checked" : ""} title="발송 준비 완료 체크" />
+        <span class="wk-dot" style="background:${cm.color}" title="${escapeHtml(it.category || "기타")}"></span>
         <span class="wk-when">${it.sendDate.slice(5)} ${it.sendTime}</span>
         <span class="wk-title" data-id="${it.id}">${escapeHtml(it.title)}</span>
+        ${scopeBadge}
         ${it.ready ? '<span class="badge ready">준비완료</span>' : badge}
       </div>`;
     })
@@ -103,10 +129,17 @@ function renderCalendar() {
     const chips = (byDate[key] || [])
       .sort((a, b) => a.sendTime.localeCompare(b.sendTime))
       .map((it) => {
-        let cls = "chip";
-        if (it.ready || it.result) cls += " done";
-        else if (key < today) cls += " overdue";
-        return `<div class="${cls}" data-id="${it.id}" title="${escapeHtml(it.title)}">${it.sendTime} ${escapeHtml(it.title)}</div>`;
+        const cm = catMeta(it.category);
+        const scope = scopeOf(it);
+        const scopeBadge = scope === "internal" ? '<span class="c-scope int">사내</span>'
+          : scope === "hcp" ? '<span class="c-scope hcp">HCP</span>' : "";
+        const dot = (it.ready || it.result) ? "ok" : (key < today ? "bad" : "plan");
+        const tip = [it.category, it.product, it.target, it.title].filter(Boolean).join(" · ");
+        return `<div class="chip" data-id="${it.id}" style="border-left-color:${cm.color}" title="${escapeHtml(tip)}">
+          <div class="c-meta"><span class="c-cat" style="color:${cm.color}">${cm.short}</span>${scopeBadge}${it.sendTime ? `<span class="c-time">${it.sendTime}</span>` : ""}<span class="c-status ${dot}"></span></div>
+          <div class="c-title">${escapeHtml(it.title)}</div>
+          ${it.product ? `<div class="c-prod">💊 ${escapeHtml(it.product)}</div>` : ""}
+        </div>`;
       })
       .join("");
     cells.push(
@@ -125,7 +158,23 @@ function renderDatalists() {
   }
 }
 
-function render() { renderStats(); renderWeekPanel(); renderCalendar(); renderDatalists(); }
+function renderLegend() {
+  const el = $("legend");
+  if (!el) return;
+  const cats = [...new Set(state.items.map((i) => i.category).filter(Boolean))];
+  const catHtml = cats
+    .map((c) => { const m = catMeta(c); return `<span><i style="background:${m.color}"></i>${escapeHtml(c)}</span>`; })
+    .join("");
+  const extra =
+    '<span class="lg-sep"></span>' +
+    '<span><b class="c-scope int">사내</b> 임직원</span>' +
+    '<span><b class="c-scope hcp">HCP</b> 대외</span>' +
+    '<span><i class="lg-dot ok"></i>준비완료</span>' +
+    '<span><i class="lg-dot bad"></i>지연</span>';
+  el.innerHTML = catHtml + extra;
+}
+
+function render() { renderStats(); renderWeekPanel(); renderCalendar(); renderDatalists(); renderLegend(); }
 
 /* ---------- 모달 ---------- */
 function openModal(dateStr, item) {
