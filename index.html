@@ -31,19 +31,31 @@
 
     <section class="card">
       <div class="cal-toolbar">
-        <button class="btn icon" id="prevBtn" aria-label="이전 달">←</button>
-        <span class="month" id="monthLabel"></span>
-        <button class="btn icon" id="nextBtn" aria-label="다음 달">→</button>
-        <button class="btn sm" id="todayBtn">오늘</button>
+        <span class="month-nav" id="monthNav">
+          <button class="btn icon" id="prevBtn" aria-label="이전 달">←</button>
+          <span class="month" id="monthLabel"></span>
+          <button class="btn icon" id="nextBtn" aria-label="다음 달">→</button>
+          <button class="btn sm" id="todayBtn">오늘</button>
+        </span>
         <span class="spacer"></span>
+        <div class="seg" id="viewToggle">
+          <button data-view="calendar" class="active">캘린더</button>
+          <button data-view="list">리스트</button>
+        </div>
         <div class="seg" id="scopeFilter">
           <button data-scope="all" class="active">전체</button>
           <button data-scope="hcp">HCP</button>
           <button data-scope="internal">사내</button>
         </div>
       </div>
+      <div class="filters">
+        <input id="searchInput" type="search" placeholder="🔍 제목·제품 검색…" />
+        <select id="filterCategory"><option value="">전체 카테고리</option></select>
+        <select id="filterOwner"><option value="">전체 담당자</option></select>
+      </div>
       <div class="cal-grid" id="calHead"></div>
       <div class="cal-grid" id="calBody"></div>
+      <div class="list-view" id="listView" style="display:none"></div>
       <div class="legend" id="legend"></div>
     </section>
   </main>

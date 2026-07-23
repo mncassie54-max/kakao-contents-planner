@@ -6,7 +6,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { requirePassword } from "./lib/gate.js";
 import { weekRange, ymd } from "./lib/week.js";
 
-const state = { year: 0, month: 0, items: [], categories: [], people: [], scopeFilter: "all", editingId: null };
+const state = { year: 0, month: 0, items: [], categories: [], people: [], scopeFilter: "all", view: "calendar", search: "", filterCategory: "", filterOwner: "", editingId: null };
 let contentsCol = null;
 let categoriesCol = null;
 let peopleCol = null;
@@ -71,6 +71,19 @@ function matchScope(it) {
   if (f === "all") return true;
   const s = scopeOf(it);
   return f === "internal" ? s === "internal" : s !== "internal";
+}
+
+// 스코프 + 검색 + 카테고리 + 담당자 종합 필터
+function matchFilters(it) {
+  if (!matchScope(it)) return false;
+  if (state.filterCategory && it.category !== state.filterCategory) return false;
+  if (state.filterOwner && it.owner !== state.filterOwner) return false;
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    const hay = `${it.title || ""} ${it.product || ""} ${it.category || ""} ${it.target || ""} ${it.owner || ""}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
 }
 
 const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
@@ -149,7 +162,7 @@ function renderCalendar() {
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const byDate = {};
-  for (const it of state.items) { if (matchScope(it)) (byDate[it.sendDate] ||= []).push(it); }
+  for (const it of state.items) { if (matchFilters(it)) (byDate[it.sendDate] ||= []).push(it); }
 
   const today = todayStr();
   const cells = [];
@@ -234,7 +247,55 @@ function renderLegend() {
   el.innerHTML = catHtml + extra;
 }
 
-function render() { renderStats(); renderWeekPanel(); renderCalendar(); renderDatalists(); renderLegend(); }
+function renderFilterOptions() {
+  const cat = $("filterCategory"), own = $("filterOwner");
+  if (cat) { const cur = cat.value; cat.innerHTML = '<option value="">전체 카테고리</option>' + state.categories.map((c) => `<option>${escapeHtml(c.name)}</option>`).join(""); cat.value = cur; }
+  if (own) { const cur = own.value; own.innerHTML = '<option value="">전체 담당자</option>' + state.people.map((p) => `<option>${escapeHtml(p.name)}</option>`).join(""); own.value = cur; }
+}
+
+function renderList() {
+  const el = $("listView");
+  if (!el) return;
+  const items = state.items.filter(matchFilters)
+    .sort((a, b) => a.sendDate.localeCompare(b.sendDate) || (a.sendTime || "").localeCompare(b.sendTime || ""));
+  if (!items.length) { el.innerHTML = '<div class="wk-empty">표시할 콘텐츠가 없습니다.</div>'; return; }
+  const today = todayStr();
+  let html = "", curMonth = "";
+  for (const it of items) {
+    const m = it.sendDate.slice(0, 7);
+    if (m !== curMonth) { curMonth = m; html += `<div class="list-month">${m.slice(0, 4)}년 ${Number(m.slice(5))}월</div>`; }
+    const cm = catMeta(it.category);
+    const scope = scopeOf(it);
+    const scopeBadge = scope === "internal" ? '<span class="c-scope int">사내</span>' : scope === "hcp" ? '<span class="c-scope hcp">HCP</span>' : "";
+    const st = (it.ready || it.result) ? "ok" : (it.sendDate < today ? "bad" : "plan");
+    html += `<div class="list-row" data-id="${it.id}">
+      <span class="list-date">${it.sendDate.slice(5)} (${weekdayKr(it.sendDate)})${it.sendTime ? " " + it.sendTime : ""}</span>
+      <span class="c-cat" style="color:${cm.color}">${escapeHtml(cm.short)}</span>
+      ${scopeBadge}
+      <span class="list-title">${escapeHtml(it.title)}</span>
+      ${it.product ? `<span class="list-tag">💊 ${escapeHtml(it.product)}</span>` : ""}
+      ${it.owner ? `<span class="list-tag">🧑 ${escapeHtml(it.owner)}</span>` : ""}
+      <span class="c-status ${st}"></span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function applyView(v) {
+  state.view = v;
+  const list = v === "list";
+  $("monthNav").style.display = list ? "none" : "";
+  $("calHead").style.display = list ? "none" : "";
+  $("calBody").style.display = list ? "none" : "";
+  $("legend").style.display = list ? "none" : "";
+  $("listView").style.display = list ? "" : "none";
+  [...$("viewToggle").children].forEach((c) => c.classList.toggle("active", c.dataset.view === v));
+  if (list) renderList(); else renderCalendar();
+}
+
+function renderView() { if (state.view === "list") renderList(); else renderCalendar(); }
+
+function render() { renderStats(); renderWeekPanel(); renderDatalists(); renderFilterOptions(); renderLegend(); renderView(); }
 
 /* ---------- 모달 ---------- */
 function openModal(dateStr, item) {
@@ -371,13 +432,30 @@ function bindUi() {
     if (t) { const item = state.items.find((i) => i.id === t.dataset.id); if (item) openModal(item.sendDate, item); }
   });
 
-  // 발송 대상 필터 (전체 / HCP·대외 / 사내)
+  // 발송 대상 필터 (전체 / HCP / 사내)
   $("scopeFilter").addEventListener("click", (e) => {
     const b = e.target.closest("[data-scope]");
     if (!b) return;
     state.scopeFilter = b.dataset.scope;
     [...$("scopeFilter").children].forEach((c) => c.classList.toggle("active", c.dataset.scope === state.scopeFilter));
-    renderCalendar();
+    renderView();
+  });
+
+  // 보기 전환 (캘린더 / 리스트)
+  $("viewToggle").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-view]");
+    if (b) applyView(b.dataset.view);
+  });
+
+  // 검색 / 카테고리 / 담당자 필터
+  $("searchInput").addEventListener("input", (e) => { state.search = e.target.value.trim(); renderView(); });
+  $("filterCategory").addEventListener("change", (e) => { state.filterCategory = e.target.value; renderView(); });
+  $("filterOwner").addEventListener("change", (e) => { state.filterOwner = e.target.value; renderView(); });
+
+  // 리스트뷰 행 클릭 → 수정
+  $("listView").addEventListener("click", (e) => {
+    const r = e.target.closest(".list-row");
+    if (r) { const it = state.items.find((i) => i.id === r.dataset.id); if (it) openModal(it.sendDate, it); }
   });
 
   // 카테고리 관리
