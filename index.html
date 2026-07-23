@@ -12,6 +12,7 @@
     <div class="brand"><span class="dot">📮</span> Kakao Contents Planner <small>· DI</small></div>
     <nav>
       <button id="newBtn" class="btn primary sm">+ 새 콘텐츠</button>
+      <button id="catBtn" class="btn ghost sm">🏷 카테고리</button>
       <a class="btn ghost sm" href="./report.html">리포트</a>
     </nav>
   </header>
@@ -35,6 +36,11 @@
         <button class="btn icon" id="nextBtn" aria-label="다음 달">→</button>
         <button class="btn sm" id="todayBtn">오늘</button>
         <span class="spacer"></span>
+        <div class="seg" id="scopeFilter">
+          <button data-scope="all" class="active">전체</button>
+          <button data-scope="hcp">HCP</button>
+          <button data-scope="internal">사내</button>
+        </div>
       </div>
       <div class="cal-grid" id="calHead"></div>
       <div class="cal-grid" id="calBody"></div>
@@ -60,6 +66,8 @@
         <div><label>포맷</label><input id="f-format" list="dl-format" placeholder="텍스트+이미지 / 카드뉴스 등" /></div>
         <div><label>발송 타겟(진료과)</label><input id="f-target" list="dl-target" placeholder="예: 순환기내과" /></div>
       </div>
+      <label>담당자</label>
+      <select id="f-owner"><option value="">담당자 선택</option></select>
       <label>코멘트</label><textarea id="f-comment" rows="2"></textarea>
 
       <label class="ready-toggle" for="f-ready">
@@ -82,6 +90,18 @@
           <button class="btn sm" id="closeBtn">닫기</button>
           <button class="btn primary sm" id="saveBtn">등록</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="catModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3>🏷 카테고리 관리</h3>
+      <div class="hint">색상·이름을 자유롭게 추가·수정·삭제할 수 있어요. 이름을 바꾸면 기존 콘텐츠에도 반영됩니다.</div>
+      <div class="cat-list" id="catList"></div>
+      <button class="btn sm" id="catAddBtn" style="margin-top:12px">+ 새 카테고리</button>
+      <div class="modal-actions">
+        <button class="btn primary sm" id="catCloseBtn" style="margin-left:auto">닫기</button>
       </div>
     </div>
   </div>

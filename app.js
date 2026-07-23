@@ -6,8 +6,23 @@ import { firebaseConfig } from "./firebase-config.js";
 import { requirePassword } from "./lib/gate.js";
 import { weekRange, ymd } from "./lib/week.js";
 
-const state = { year: 0, month: 0, items: [], editingId: null };
+const state = { year: 0, month: 0, items: [], categories: [], people: [], scopeFilter: "all", editingId: null };
 let contentsCol = null;
+let categoriesCol = null;
+let peopleCol = null;
+
+// 2026 대한민국 공휴일 (대체공휴일 포함). 필요시 값만 수정하세요.
+const HOLIDAYS = {
+  "2026-01-01": "신정",
+  "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
+  "2026-03-01": "삼일절", "2026-03-02": "대체공휴일",
+  "2026-05-05": "어린이날", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
+  "2026-06-03": "지방선거일", "2026-06-06": "현충일",
+  "2026-08-15": "광복절", "2026-08-17": "대체공휴일",
+  "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴", "2026-09-28": "대체공휴일",
+  "2026-10-03": "개천절", "2026-10-05": "대체공휴일", "2026-10-09": "한글날",
+  "2026-12-25": "성탄절",
+};
 
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
@@ -25,17 +40,23 @@ function weekItems() {
     .sort((a, b) => a.sendDate.localeCompare(b.sendDate) || a.sendTime.localeCompare(b.sendTime));
 }
 
-const CATEGORY_META = {
-  "AI Literacy": { color: "#64748b", short: "AI" },
-  "V-insight": { color: "#4f46e5", short: "V-insight" },
-  "메디닥링크": { color: "#0891b2", short: "메디닥" },
-  "카드뉴스": { color: "#d97706", short: "카드뉴스" },
-  "쇼츠": { color: "#db2777", short: "쇼츠" },
-  "VDS": { color: "#7c3aed", short: "VDS" },
-  "웨비나": { color: "#059669", short: "웨비나" },
-};
+// 처음 1회 자동 시드되는 기본 카테고리 (이후 앱에서 자유롭게 추가/수정/삭제)
+const DEFAULT_CATEGORIES = [
+  { name: "AI Literacy", color: "#64748b" },
+  { name: "V-insight", color: "#4f46e5" },
+  { name: "메디닥링크", color: "#0891b2" },
+  { name: "카드뉴스", color: "#d97706" },
+  { name: "쇼츠", color: "#db2777" },
+  { name: "VDS", color: "#7c3aed" },
+  { name: "웨비나", color: "#059669" },
+];
 const NO_CAT = { color: "#94a3b8", short: "기타" };
-const catMeta = (c) => CATEGORY_META[c] || NO_CAT;
+function hashColor(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h} 52% 46%)`; }
+function catMeta(name) {
+  if (!name) return NO_CAT;
+  const c = state.categories.find((x) => x.name === name);
+  return { color: c ? c.color : hashColor(name), short: name };
+}
 
 // 발송 대상 구분: 사내(임직원) / 대외(HCP) / 미지정
 function scopeOf(it) {
@@ -43,6 +64,19 @@ function scopeOf(it) {
   if (/임직원|내부용|internal/i.test(s)) return "internal";
   if (/HCP/i.test(s)) return "hcp";
   return "";
+}
+// 필터: all=전체, hcp=대외(사내 제외), internal=사내만
+function matchScope(it) {
+  const f = state.scopeFilter;
+  if (f === "all") return true;
+  const s = scopeOf(it);
+  return f === "internal" ? s === "internal" : s !== "internal";
+}
+
+const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
+function weekdayKr(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return WEEKDAY_KR[new Date(y, m - 1, d).getDay()];
 }
 
 function statusOf(it) {
@@ -97,7 +131,7 @@ function renderWeekPanel() {
       return `<div class="wk-row ${it.ready ? "done" : ""}">
         <input type="checkbox" class="wk-check" data-id="${it.id}" ${it.ready ? "checked" : ""} title="발송 준비 완료 체크" />
         <span class="wk-dot" style="background:${cm.color}" title="${escapeHtml(it.category || "기타")}"></span>
-        <span class="wk-when">${it.sendDate.slice(5)} ${it.sendTime}</span>
+        <span class="wk-when">${it.sendDate.slice(5)} (${weekdayKr(it.sendDate)}) ${it.sendTime}</span>
         <span class="wk-title" data-id="${it.id}">${escapeHtml(it.title)}</span>
         ${scopeBadge}
         ${it.ready ? '<span class="badge ready">준비완료</span>' : badge}
@@ -115,7 +149,7 @@ function renderCalendar() {
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const byDate = {};
-  for (const it of state.items) (byDate[it.sendDate] ||= []).push(it);
+  for (const it of state.items) { if (matchScope(it)) (byDate[it.sendDate] ||= []).push(it); }
 
   const today = todayStr();
   const cells = [];
@@ -126,6 +160,7 @@ function renderCalendar() {
     if (!started) { for (let i = 0; i < dow; i++) cells.push('<div class="cal-cell dim"></div>'); started = true; }
     const key = ymdParts(year, month, d);
     const isToday = key === today;
+    const holiday = HOLIDAYS[key];
     const chips = (byDate[key] || [])
       .sort((a, b) => a.sendTime.localeCompare(b.sendTime))
       .map((it) => {
@@ -143,8 +178,8 @@ function renderCalendar() {
       })
       .join("");
     cells.push(
-      `<div class="cal-cell ${isToday ? "today" : ""}" data-date="${key}">
-        <div class="cal-date"><span class="num">${d}</span></div>${chips}</div>`
+      `<div class="cal-cell ${isToday ? "today" : ""} ${holiday ? "holiday" : ""}" data-date="${key}">
+        <div class="cal-date"><span class="num">${d}</span>${holiday ? `<span class="hol">${holiday}</span>` : ""}</div>${chips}</div>`
     );
   }
   while (cells.length % 5 !== 0) cells.push('<div class="cal-cell dim"></div>');
@@ -152,10 +187,35 @@ function renderCalendar() {
 }
 
 function renderDatalists() {
-  for (const key of ["category", "product", "format", "target"]) {
+  for (const key of ["product", "format", "target"]) {
     const vals = [...new Set(state.items.map((i) => i[key]).filter(Boolean))];
     $(`dl-${key}`).innerHTML = vals.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
   }
+  // 카테고리: 관리 목록 + 실제 사용된 값 합집합
+  const catNames = [...new Set([...state.categories.map((c) => c.name), ...state.items.map((i) => i.category).filter(Boolean)])];
+  $("dl-category").innerHTML = catNames.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
+}
+
+function renderPeople() {
+  const sel = $("f-owner");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">담당자 선택</option>' +
+    state.people.map((p) => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+  sel.value = cur;
+}
+
+function renderCatManager() {
+  const el = $("catList");
+  if (!el) return;
+  el.innerHTML = state.categories
+    .map((c) => `<div class="cat-row" data-id="${c.id}">
+      <input type="color" class="cat-color" value="${c.color}" />
+      <input type="text" class="cat-name" value="${escapeHtml(c.name)}" />
+      <button class="btn sm cat-save">저장</button>
+      <button class="btn sm cat-del" style="color:var(--red); border-color:var(--red)">삭제</button>
+    </div>`)
+    .join("");
 }
 
 function renderLegend() {
@@ -168,7 +228,7 @@ function renderLegend() {
   const extra =
     '<span class="lg-sep"></span>' +
     '<span><b class="c-scope int">사내</b> 임직원</span>' +
-    '<span><b class="c-scope hcp">HCP</b> 대외</span>' +
+    '<span><b class="c-scope hcp">HCP</b></span>' +
     '<span><i class="lg-dot ok"></i>준비완료</span>' +
     '<span><i class="lg-dot bad"></i>지연</span>';
   el.innerHTML = catHtml + extra;
@@ -189,6 +249,7 @@ function openModal(dateStr, item) {
   $("f-product").value = item?.product || "";
   $("f-format").value = item?.format || "";
   $("f-target").value = item?.target || "";
+  $("f-owner").value = item?.owner || "";
   $("f-comment").value = item?.comment || "";
   $("f-ready").checked = !!item?.ready;
   $("resultSection").style.display = item ? "block" : "none";
@@ -210,6 +271,7 @@ function formData() {
     product: $("f-product").value,
     format: $("f-format").value,
     target: $("f-target").value,
+    owner: $("f-owner").value,
     comment: $("f-comment").value,
     ready: $("f-ready").checked,
   };
@@ -308,6 +370,55 @@ function bindUi() {
     const t = e.target.closest(".wk-title");
     if (t) { const item = state.items.find((i) => i.id === t.dataset.id); if (item) openModal(item.sendDate, item); }
   });
+
+  // 발송 대상 필터 (전체 / HCP·대외 / 사내)
+  $("scopeFilter").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-scope]");
+    if (!b) return;
+    state.scopeFilter = b.dataset.scope;
+    [...$("scopeFilter").children].forEach((c) => c.classList.toggle("active", c.dataset.scope === state.scopeFilter));
+    renderCalendar();
+  });
+
+  // 카테고리 관리
+  $("catBtn").onclick = () => { renderCatManager(); $("catModalBackdrop").classList.remove("hidden"); };
+  $("catCloseBtn").onclick = () => $("catModalBackdrop").classList.add("hidden");
+  $("catModalBackdrop").onclick = (e) => { if (e.target === $("catModalBackdrop")) $("catModalBackdrop").classList.add("hidden"); };
+  $("catAddBtn").onclick = () => {
+    const row = document.createElement("div");
+    row.className = "cat-row";
+    row.innerHTML = `<input type="color" class="cat-color" value="#4f46e5" />
+      <input type="text" class="cat-name" placeholder="새 카테고리 이름" />
+      <button class="btn sm cat-save">저장</button>
+      <button class="btn sm cat-del" style="color:var(--red); border-color:var(--red)">삭제</button>`;
+    $("catList").appendChild(row);
+    row.querySelector(".cat-name").focus();
+  };
+  $("catList").addEventListener("click", async (e) => {
+    const row = e.target.closest(".cat-row");
+    if (!row) return;
+    const id = row.dataset.id;
+    if (e.target.classList.contains("cat-save")) {
+      const name = row.querySelector(".cat-name").value.trim();
+      const color = row.querySelector(".cat-color").value;
+      if (!name) { alert("카테고리 이름을 입력하세요."); return; }
+      try {
+        if (id) {
+          const old = state.categories.find((x) => x.id === id);
+          await updateDoc(doc(categoriesCol, id), { name, color });
+          if (old && old.name !== name) {
+            for (const it of state.items) if (it.category === old.name) await updateDoc(doc(contentsCol, it.id), { category: name });
+          }
+        } else {
+          await addDoc(categoriesCol, { name, color });
+        }
+      } catch (err) { alert("저장 실패: " + err.message); }
+    } else if (e.target.classList.contains("cat-del")) {
+      if (!id) { row.remove(); return; }
+      if (!confirm("이 카테고리를 삭제할까요? 기존 콘텐츠의 값은 유지되며 '기타'로 표시됩니다.")) return;
+      try { await deleteDoc(doc(categoriesCol, id)); } catch (err) { alert("삭제 실패: " + err.message); }
+    }
+  });
 }
 
 function configMissing() {
@@ -327,6 +438,20 @@ async function main() {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   contentsCol = collection(db, "contents");
+  categoriesCol = collection(db, "categories");
+  peopleCol = collection(db, "people");
+
+  let catSeeded = false;
+  onSnapshot(categoriesCol, (snap) => {
+    state.categories = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
+    if (!catSeeded && state.categories.length === 0) { catSeeded = true; DEFAULT_CATEGORIES.forEach((c) => addDoc(categoriesCol, c)); }
+    renderCatManager();
+    render();
+  });
+  onSnapshot(peopleCol, (snap) => {
+    state.people = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    renderPeople();
+  });
 
   onSnapshot(contentsCol, (snap) => {
     state.items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));

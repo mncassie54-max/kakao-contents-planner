@@ -177,8 +177,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .modal h3 { margin: 0 0 4px; font-size: 18px; }
 .modal .hint { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
 .modal label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; }
-.modal input, .modal textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 10px; font-family: inherit; font-size: 14px; background: var(--surface); color: var(--text); }
-.modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.modal input, .modal textarea, .modal select { width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 10px; font-family: inherit; font-size: 14px; background: var(--surface); color: var(--text); }
+.modal input:focus, .modal textarea:focus, .modal select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
 .ready-toggle { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); cursor: pointer; }
@@ -230,3 +230,22 @@ tbody tr:hover { background: var(--surface-2); }
 
 .notice { padding: 12px 16px; border-radius: 12px; font-size: 13.5px; }
 .notice.warn { background: var(--red-weak); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); }
+
+/* Segmented scope filter */
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.seg button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+/* Category short label clamp */
+.c-cat { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Holidays */
+.cal-cell.holiday .cal-date .num { color: var(--red); }
+.hol { font-size: 10px; font-weight: 700; color: var(--red); background: var(--red-weak); padding: 1px 6px; border-radius: 999px; }
+
+/* Category manager */
+.cat-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cat-row { display: flex; align-items: center; gap: 8px; }
+.cat-row .cat-color { width: 40px; height: 36px; padding: 2px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); cursor: pointer; flex: none; }
+.cat-row .cat-name { flex: 1; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; font: inherit; background: var(--surface); color: var(--text); }
+.cat-row .cat-name:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
