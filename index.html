@@ -7,55 +7,80 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="toolbar">
-      <h2>Kakao Contents Planner</h2>
-      <a class="navlink" href="./report.html">리포트 →</a>
-    </div>
+  <header class="appbar">
+    <div class="brand"><span class="dot">📮</span> Kakao Contents Planner <small>· DI</small></div>
+    <nav>
+      <button id="newBtn" class="btn primary sm">+ 새 콘텐츠</button>
+      <a class="btn ghost sm" href="./report.html">리포트</a>
+    </nav>
+  </header>
 
-    <div id="banner" class="banner">불러오는 중…</div>
+  <main class="container">
+    <section id="stats" class="stats"></section>
 
-    <div class="toolbar">
-      <button id="prevBtn">← 이전</button>
-      <strong id="monthLabel"></strong>
-      <button id="nextBtn">다음 →</button>
-    </div>
+    <section class="card wk">
+      <div class="card-head">
+        <h3>🗓️ 이번 주 발송 준비</h3>
+        <span class="sub" id="wkSummary"></span>
+      </div>
+      <div class="progress"><i id="wkBar" style="width:0%"></i></div>
+      <div class="wk-list" id="wkList"></div>
+    </section>
 
-    <div class="cal-grid" id="calHead"></div>
-    <div class="cal-grid" id="calBody"></div>
-  </div>
+    <section class="card">
+      <div class="cal-toolbar">
+        <button class="btn icon" id="prevBtn" aria-label="이전 달">←</button>
+        <span class="month" id="monthLabel"></span>
+        <button class="btn icon" id="nextBtn" aria-label="다음 달">→</button>
+        <button class="btn sm" id="todayBtn">오늘</button>
+        <span class="spacer"></span>
+      </div>
+      <div class="cal-grid" id="calHead"></div>
+      <div class="cal-grid" id="calBody"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i> 예정</span>
+        <span><i style="background:var(--green)"></i> 준비완료 / 결과입력</span>
+        <span><i style="background:var(--red)"></i> 지연(지난 발송·결과없음)</span>
+      </div>
+    </section>
+  </main>
 
   <div id="modalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
       <h3 id="modalTitle">콘텐츠 등록</h3>
+      <div class="hint">카카오 발송 계획을 입력하세요. * 는 필수.</div>
       <div class="row">
-        <div><label>발송일</label><input type="date" id="f-sendDate" /></div>
-        <div><label>발송시간</label><input type="time" id="f-sendTime" value="10:00" /></div>
+        <div><label>발송일 *</label><input type="date" id="f-sendDate" /></div>
+        <div><label>발송시간 *</label><input type="time" id="f-sendTime" value="10:00" /></div>
       </div>
-      <label>제목 *</label><input id="f-title" />
-      <label>연결 링크</label><input id="f-link" />
+      <label>제목 *</label><input id="f-title" placeholder="예: 여름 건강관리 뉴스레터" />
+      <label>연결 링크</label><input id="f-link" placeholder="https://" />
       <div class="row">
-        <div><label>카테고리</label><input id="f-category" list="dl-category" /></div>
+        <div><label>카테고리</label><input id="f-category" list="dl-category" placeholder="뉴스레터 등" /></div>
         <div><label>제품명</label><input id="f-product" list="dl-product" /></div>
       </div>
-      <label>포맷</label><input id="f-format" list="dl-format" />
+      <label>포맷</label><input id="f-format" list="dl-format" placeholder="텍스트+이미지 / 카드뉴스 등" />
       <label>코멘트</label><textarea id="f-comment" rows="2"></textarea>
 
-      <div id="resultSection" style="display:none">
-        <hr style="margin:16px 0" />
-        <h4 style="margin:0 0 4px">발송 후 결과</h4>
+      <label class="ready-toggle" for="f-ready">
+        <input type="checkbox" id="f-ready" />
+        <span><span class="t">발송 준비 완료</span><br /><span class="d">체크하면 이번 주 준비 현황에 완료로 집계됩니다.</span></span>
+      </label>
+
+      <div id="resultSection" class="result-box" style="display:none">
+        <h4>발송 후 결과</h4>
         <div class="row">
           <div><label>오픈률(%)</label><input type="number" id="f-openRate" step="0.1" /></div>
           <div><label>피드백</label><input id="f-feedback" /></div>
         </div>
-        <button id="saveResultBtn" style="margin-top:8px">결과 저장</button>
+        <button class="btn sm" id="saveResultBtn" style="margin-top:10px">결과 저장</button>
       </div>
 
       <div class="modal-actions">
-        <button id="deleteBtn" style="display:none">삭제</button>
-        <div class="row" style="gap:8px">
-          <button id="closeBtn">닫기</button>
-          <button id="saveBtn" class="primary">등록</button>
+        <button class="btn sm" id="deleteBtn" style="display:none; color:var(--red); border-color:var(--red)">삭제</button>
+        <div style="display:flex; gap:8px; margin-left:auto">
+          <button class="btn sm" id="closeBtn">닫기</button>
+          <button class="btn primary sm" id="saveBtn">등록</button>
         </div>
       </div>
     </div>

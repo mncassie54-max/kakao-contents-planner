@@ -7,31 +7,43 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="toolbar">
-      <h2>리포트</h2>
-      <a class="navlink" href="./index.html">← 캘린더</a>
-    </div>
+  <header class="appbar">
+    <div class="brand"><span class="dot">📮</span> Kakao Contents Planner <small>· 리포트</small></div>
+    <nav>
+      <a class="btn ghost sm" href="./index.html">← 캘린더</a>
+    </nav>
+  </header>
 
-    <div class="row" style="align-items:flex-end; margin-bottom:16px; max-width:640px">
-      <div><label>시작일</label><input type="date" id="from" /></div>
-      <div><label>종료일</label><input type="date" id="to" /></div>
-      <button id="previewBtn">미리보기</button>
-      <button id="downloadBtn" class="primary">CSV 다운로드</button>
-    </div>
+  <main class="container">
+    <section class="card">
+      <div class="card-head">
+        <h3>📄 기간 리포트</h3>
+        <span class="sub">기간을 지정해 발송 계획과 결과를 조회하고 CSV로 내려받으세요.</span>
+      </div>
+      <div class="row" style="align-items:flex-end; max-width:680px; flex-wrap:wrap">
+        <div style="min-width:150px"><label style="font-size:12.5px;font-weight:600;color:var(--muted)">시작일</label>
+          <input type="date" id="from" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);color:var(--text)" /></div>
+        <div style="min-width:150px"><label style="font-size:12.5px;font-weight:600;color:var(--muted)">종료일</label>
+          <input type="date" id="to" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);color:var(--text)" /></div>
+        <button class="btn sm" id="previewBtn">미리보기</button>
+        <button class="btn primary sm" id="downloadBtn">⬇ CSV 다운로드</button>
+      </div>
+    </section>
 
-    <table>
-      <thead>
-        <tr>
-          <th>발송일</th><th>시간</th><th>제목</th><th>카테고리</th>
-          <th>제품</th><th>포맷</th><th>오픈률</th><th>피드백</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td colspan="8" style="color:#888">기간을 지정하고 미리보기를 누르세요.</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <section class="card" style="padding:8px 8px 4px">
+      <table>
+        <thead>
+          <tr>
+            <th>발송일</th><th>시간</th><th>제목</th><th>카테고리</th>
+            <th>제품</th><th>포맷</th><th>오픈률</th><th>피드백</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" style="color:var(--muted); padding:16px">기간을 지정하고 미리보기를 누르세요.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
   <script type="module" src="./report.js"></script>
 </body>
 </html>
